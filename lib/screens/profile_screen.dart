@@ -6,8 +6,9 @@ import '../widgets/app_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onLogout;
+  final VoidCallback? onOpenDrawer;
 
-  const ProfileScreen({super.key, this.onLogout});
+  const ProfileScreen({super.key, this.onLogout, this.onOpenDrawer});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -106,7 +107,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           leading: Builder(
             builder: (ctx) => IconButton(
               icon: const Icon(Icons.menu_rounded),
-              onPressed: () => Scaffold.of(ctx).openDrawer(),
+              onPressed: () {
+                final onOpen = widget.onOpenDrawer;
+                if (onOpen != null) {
+                  onOpen();
+                } else {
+                  Scaffold.of(ctx).openDrawer();
+                }
+              },
             ),
           ),
         ),
@@ -139,7 +147,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               builder: (ctx) => IconButton(
                 icon: const Icon(Icons.menu_rounded,
                     color: Colors.white),
-                onPressed: () => Scaffold.of(ctx).openDrawer(),
+                onPressed: () {
+                  final onOpen = widget.onOpenDrawer;
+                  if (onOpen != null) {
+                    onOpen();
+                  } else {
+                    Scaffold.of(ctx).openDrawer();
+                  }
+                },
               ),
             ),
             actions: [
@@ -679,7 +694,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: InkWell(
           onTap: () async {
             final confirm =
-                await Navigator.pushNamed(context, '/disconnect');
+                await Navigator.pushNamed(context, '/disconnect', arguments: {
+              'photo': _profile?['photo_profil'],
+              'prenom': _profile?['prenom'],
+              'nom': _profile?['nom'],
+            });
             if (confirm == true && mounted) {
               widget.onLogout?.call();
             }

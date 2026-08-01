@@ -18,6 +18,9 @@ import 'screens/map_view_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/planning_screen.dart';
 import 'screens/disconnect_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/help_screen.dart';
+import 'screens/about_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -95,6 +98,18 @@ class KingDelyRouteApp extends StatelessWidget {
           case '/disconnect':
             return MaterialPageRoute(
               builder: (_) => const DisconnectScreen(),
+            );
+          case '/settings':
+            return MaterialPageRoute(
+              builder: (_) => const SettingsScreen(),
+            );
+          case '/help':
+            return MaterialPageRoute(
+              builder: (_) => const HelpScreen(),
+            );
+          case '/about':
+            return MaterialPageRoute(
+              builder: (_) => const AboutScreen(),
             );
           default:
             return MaterialPageRoute(

@@ -7,6 +7,8 @@ import '../models/livraison.dart';
 /// Service de notifications locales. Surveille les nouvelles livraisons
 /// par polling et affiche des notifications système.
 class NotificationService {
+  static final NotificationService instance = NotificationService();
+
   int _lastCount = 0;
   Timer? _pollTimer;
   BuildContext? _context;

@@ -7,7 +7,8 @@ import '../models/livraison.dart';
 import '../widgets/app_theme.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final VoidCallback? onOpenDrawer;
+  const MapScreen({super.key, this.onOpenDrawer});
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
@@ -150,10 +151,10 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final enCours = context.watch<LivraisonProvider>().livraisons
-        .where((l) => l.statut == 'en_cours').toList();
+    final actives = context.watch<LivraisonProvider>().livraisons
+        .where((l) => l.isActive).toList();
     final grouped = <String, List<Livraison>>{};
-    for (final l in enCours) {
+    for (final l in actives) {
       final z = _detectZone(l);
       grouped.putIfAbsent(z, () => []).add(l);
     }
@@ -163,6 +164,19 @@ class _MapScreenState extends State<MapScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu_rounded, color: Colors.white),
+            onPressed: () {
+              final onOpen = widget.onOpenDrawer;
+              if (onOpen != null) {
+                onOpen();
+              } else {
+                Scaffold.of(ctx).openDrawer();
+              }
+            },
+          ),
+        ),
         title: const Text('Carte des livraisons',
             style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
@@ -191,14 +205,14 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
           Expanded(
-            child: enCours.isEmpty && !_loadingLocation
+            child: actives.isEmpty && !_loadingLocation
                 ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.map_rounded, size: 48, color: AppColors.outlineVariant),
                         const SizedBox(height: 12),
-                        const Text('Aucune livraison en cours',
+                        const Text('Aucune livraison assignée',
                             style: TextStyle(color: AppColors.onSurfaceVariant)),
                       ],
                     ),
@@ -206,7 +220,7 @@ class _MapScreenState extends State<MapScreen> {
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                     children: [
-                      _buildLocationCard(enCours.length),
+                      _buildLocationCard(actives.length),
                       const SizedBox(height: 16),
                       ..._zones.entries.map((entry) {
                         final list = grouped[entry.key] ?? [];
@@ -259,7 +273,7 @@ class _MapScreenState extends State<MapScreen> {
                           fontWeight: FontWeight.w600,
                           color: AppColors.onSurface)),
                   Text(
-                    '$count livraison${count > 1 ? 's' : ''} en cours',
+                    '$count livraison${count > 1 ? 's' : ''} assignée${count > 1 ? 's' : ''}',
                     style: const TextStyle(
                         fontSize: 12, color: AppColors.onSurfaceVariant),
                   ),

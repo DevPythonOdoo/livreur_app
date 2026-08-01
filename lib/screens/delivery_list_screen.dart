@@ -9,7 +9,10 @@ import '../widgets/app_theme.dart';
 import 'map_view_screen.dart';
 
 class DeliveryListScreen extends StatefulWidget {
-  const DeliveryListScreen({super.key});
+  final String initialFilter;
+  final VoidCallback? onOpenDrawer;
+
+  const DeliveryListScreen({super.key, this.initialFilter = '', this.onOpenDrawer});
 
   @override
   State<DeliveryListScreen> createState() => _DeliveryListScreenState();
@@ -23,7 +26,11 @@ class _DeliveryListScreenState extends State<DeliveryListScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<LivraisonProvider>().loadLivraisons();
+      final prov = context.read<LivraisonProvider>();
+      if (widget.initialFilter.isNotEmpty) {
+        prov.setFilter(widget.initialFilter);
+      }
+      prov.loadLivraisons();
     });
     _searchCtrl.addListener(() {
       setState(() => _searchQuery = _searchCtrl.text.trim().toLowerCase());
@@ -55,7 +62,14 @@ class _DeliveryListScreenState extends State<DeliveryListScreen> {
         leading: Builder(
           builder: (ctx) => IconButton(
             icon: const Icon(Icons.menu_rounded, color: Colors.white),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
+            onPressed: () {
+              final onOpen = widget.onOpenDrawer;
+              if (onOpen != null) {
+                onOpen();
+              } else {
+                Scaffold.of(ctx).openDrawer();
+              }
+            },
           ),
         ),
         title: const Text('Mes livraisons',
@@ -224,6 +238,7 @@ class _DeliveryListScreenState extends State<DeliveryListScreen> {
     final filters = [
       ('Toutes', ''),
       ('En cours', 'active'),
+      ('En retard', 'retard'),
       ('Livrées', 'livree'),
       ('Échec', 'echec'),
     ];
@@ -240,9 +255,11 @@ class _DeliveryListScreenState extends State<DeliveryListScreen> {
                 ? AppColors.statusSuccess
                 : value == 'echec'
                     ? AppColors.statusFailed
-                    : value == 'active'
-                        ? AppColors.primaryContainer
-                        : AppColors.primaryContainer;
+                    : value == 'retard'
+                        ? AppColors.statusFailed
+                        : value == 'active'
+                            ? AppColors.primaryContainer
+                            : AppColors.primaryContainer;
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: ChoiceChip(
@@ -277,9 +294,11 @@ class _DeliveryListScreenState extends State<DeliveryListScreen> {
         ? "aujourd'hui"
         : prov.filter == 'active'
             ? 'actives'
-            : prov.filter == 'livree'
-                ? 'livrées'
-                : 'en échec';
+            : prov.filter == 'retard'
+                ? 'en retard'
+                : prov.filter == 'livree'
+                    ? 'livrées'
+                    : 'en échec';
     return Padding(
       padding: const EdgeInsets.symmetric(
           horizontal: Spacing.marginMobile, vertical: Spacing.xs),

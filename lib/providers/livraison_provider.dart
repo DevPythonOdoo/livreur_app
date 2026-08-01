@@ -26,10 +26,13 @@ class LivraisonProvider extends ChangeNotifier {
   bool _isPlanningLoading = false;
   String? _planningError;
 
-  List<Livraison> get livraisons =>
-      _filter.isEmpty
-          ? _livraisons
-          : _livraisons.where((l) => l.statut == _filter).toList();
+  List<Livraison> get livraisons {
+    if (_filter.isEmpty) return _livraisons;
+    if (_filter == 'retard') {
+      return _livraisons.where((l) => l.enRetard).toList();
+    }
+    return _livraisons.where((l) => l.statut == _filter).toList();
+  }
   Livraison? get selectedLivraison => _selectedLivraison;
   DeliveryStats? get stats => _stats;
   bool get isLoading => _isLoading;

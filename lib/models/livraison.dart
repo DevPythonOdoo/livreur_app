@@ -13,6 +13,8 @@ class Livraison {
   final String ville;
   final String statut;
   final String? statutLabel;
+  final DateTime? dateLivraisonSouhaitee;
+  final bool enRetard;
   final String? dateDepart;
   final String? dateArrivee;
   final double fraisLivraison;
@@ -40,6 +42,8 @@ class Livraison {
     required this.ville,
     required this.statut,
     this.statutLabel,
+    this.dateLivraisonSouhaitee,
+    this.enRetard = false,
     this.dateDepart,
     this.dateArrivee,
     required this.fraisLivraison,
@@ -70,6 +74,10 @@ class Livraison {
       ville: json['ville'] ?? '',
       statut: json['statut'] ?? 'preparation',
       statutLabel: json['statut_label'],
+      dateLivraisonSouhaitee: json['date_livraison_souhaitee'] != null
+          ? DateTime.tryParse(json['date_livraison_souhaitee'] as String)
+          : null,
+      enRetard: json['en_retard'] == true,
       dateDepart: json['date_depart'],
       dateArrivee: json['date_arrivee'],
       fraisLivraison: double.tryParse('${json['frais_livraison'] ?? '0'}') ?? 0,
@@ -168,18 +176,20 @@ class LivraisonEvent {
   }
 }
 
-/// Statistiques globales du livreur (aujourd'hui, en cours, livrées, échecs).
+/// Statistiques globales du livreur (aujourd'hui, en cours, livrées, échecs, en retard).
 class DeliveryStats {
   final int aujourdHui;
   final int enCours;
   final int livrees;
   final int echecs;
+  final int enRetard;
 
   DeliveryStats({
     required this.aujourdHui,
     required this.enCours,
     required this.livrees,
     required this.echecs,
+    this.enRetard = 0,
   });
 
   /// Construit une instance [DeliveryStats] à partir d'un JSON.
@@ -189,6 +199,7 @@ class DeliveryStats {
       enCours: json['en_cours'] ?? 0,
       livrees: json['livrees'] ?? 0,
       echecs: json['echecs'] ?? 0,
+      enRetard: json['en_retard'] ?? 0,
     );
   }
 }

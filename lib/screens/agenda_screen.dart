@@ -8,7 +8,8 @@ import '../widgets/app_theme.dart';
 
 class AgendaScreen extends StatefulWidget {
   final void Function(int index)? onNavigateToDetail;
-  const AgendaScreen({super.key, this.onNavigateToDetail});
+  final VoidCallback? onOpenDrawer;
+  const AgendaScreen({super.key, this.onNavigateToDetail, this.onOpenDrawer});
 
   @override
   State<AgendaScreen> createState() => _AgendaScreenState();
@@ -107,6 +108,19 @@ class _AgendaScreenState extends State<AgendaScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu_rounded, color: Colors.white),
+            onPressed: () {
+              final onOpen = widget.onOpenDrawer;
+              if (onOpen != null) {
+                onOpen();
+              } else {
+                Scaffold.of(ctx).openDrawer();
+              }
+            },
+          ),
+        ),
         title: const Text('Agenda',
             style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,

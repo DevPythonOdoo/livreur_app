@@ -25,6 +25,7 @@ dependencies:
   geolocator: ^14.0.2
   share_plus: ^12.0.2
   path_provider: ^2.1.5
+  wakelock_plus: ^1.2.0
 
 dev_dependencies:
   flutter_test:
@@ -37,17 +38,12 @@ flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/logo.png"
-  adaptive_icon_background: "#0C1E33"
+  adaptive_icon_background: "0xFFFFFFFF"
   adaptive_icon_foreground: "assets/logo.png"
   min_sdk_android: 24
 
-flutter_native_splash:
-  color: "#FF6B35"
-  image: "assets/logo.png"
-  android: true
-  ios: false
-  android_gravity: center
-  fullscreen: true
+
+  
 
 flutter:
   uses-material-design: true

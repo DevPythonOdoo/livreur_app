@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../providers/livraison_provider.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../models/livraison.dart';
-import '../widgets/app_logo.dart';
 import '../widgets/app_theme.dart';
+import '../widgets/main_drawer.dart';
 import 'dashboard_screen.dart';
 import 'delivery_list_screen.dart';
 import 'agenda_screen.dart';
@@ -22,8 +23,9 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   Map<String, dynamic>? _profile;
-  final _notifService = NotificationService();
+  final _notifService = NotificationService.instance;
   late final LivraisonProvider _livraisonProvider;
   late final AuthProvider _authProvider;
   bool _authChecked = false;
@@ -34,19 +36,25 @@ class _MainShellState extends State<MainShell> {
     super.initState();
     _livraisonProvider = Provider.of<LivraisonProvider>(context, listen: false);
     _authProvider = Provider.of<AuthProvider>(context, listen: false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _authProvider.addListener(_onAuthChanged);
       _authChecked = true;
       _notifService.requestPermission();
-      _notifService.startPolling(context, () async {
-        final res = await ApiService().get('/livraisons/');
-        if (res['status'] == 200) {
-          final body = res['body'];
-          final items = body is Map ? body['results'] as List : body as List;
-          return items.map((j) => Livraison.fromJson(j)).toList();
-        }
-        return [];
-      });
+      final prefs = await SharedPreferences.getInstance();
+      final notificationsEnabled =
+          prefs.getBool('notifications_enabled') ?? true;
+      if (!mounted) return;
+      if (notificationsEnabled) {
+        _notifService.startPolling(context, () async {
+          final res = await ApiService().get('/livraisons/');
+          if (res['status'] == 200) {
+            final body = res['body'];
+            final items = body is Map ? body['results'] as List : body as List;
+            return items.map((j) => Livraison.fromJson(j)).toList();
+          }
+          return [];
+        });
+      }
       _livraisonProvider.startAutoRefresh();
       _loadProfile();
     });
@@ -81,14 +89,32 @@ class _MainShellState extends State<MainShell> {
   List<Widget> get _pages => [
         DashboardScreen(
           onNavigateToDeliveries: () => setState(() => _currentIndex = 1),
+          onSelectTab: (i) => setState(() => _currentIndex = i),
+          onHistory: () => Navigator.pushNamed(context, '/history'),
+          onChangePassword: () =>
+              Navigator.pushNamed(context, '/change-password'),
+          onLateOrders: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const DeliveryListScreen(initialFilter: 'retard'),
+            ),
+          ),
+          onSettings: () => Navigator.pushNamed(context, '/settings'),
+          onHelp: () => Navigator.pushNamed(context, '/help'),
+          onAbout: () => Navigator.pushNamed(context, '/about'),
+          onLogout: _confirmLogout,
           livreurName: _fullName,
           profile: _profile,
         ),
-        const DeliveryListScreen(),
-        const AgendaScreen(),
-        const MapScreen(),
-        ProfileScreen(onLogout: _cleanLogout),
+        DeliveryListScreen(onOpenDrawer: _openDrawer),
+        AgendaScreen(onOpenDrawer: _openDrawer),
+        MapScreen(onOpenDrawer: _openDrawer),
+        ProfileScreen(onLogout: _cleanLogout, onOpenDrawer: _openDrawer),
       ];
+
+  void _openDrawer() {
+    _scaffoldKey.currentState?.openDrawer();
+  }
 
   String get _fullName {
     final prenom = _profile?['prenom'] as String? ?? '';
@@ -108,15 +134,25 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<bool> _confirmLogout() async {
-    final result = await Navigator.pushNamed(context, '/disconnect');
+    final result = await Navigator.pushNamed(context, '/disconnect',
+        arguments: {
+          'photo': _profile?['photo_profil'],
+          'prenom': _profile?['prenom'],
+          'nom': _profile?['nom'],
+        });
     return result == true;
+  }
+
+  Future<void> _handleLogout() async {
+    final confirm = await _confirmLogout();
+    if (confirm) {
+      _cleanLogout();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final prenom = _profile?['prenom'] as String? ?? '';
-    final nom = _profile?['nom'] as String? ?? '';
-    final fullName = '$prenom $nom'.trim();
+    final fullName = _fullName;
     final photoUrl = _profile?['photo_profil'] as String?;
     final telephone = _profile?['telephone'] as String? ?? '';
     final vehicule = _profile?['vehicule'] as String? ?? '';
@@ -124,187 +160,30 @@ class _MainShellState extends State<MainShell> {
     final dispo = _profile?['statut'] == 'disponible';
 
     return Scaffold(
+      key: _scaffoldKey,
       body: _pages[_currentIndex],
-      drawer: Drawer(
-        width: 300,
-        backgroundColor: AppColors.surfaceDim,
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 48, 20, 24),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GradientCircleAvatar(
-                    radius: 30,
-                    imageUrl:
-                        photoUrl != null ? ApiService().mediaUrl(photoUrl) : null,
-                    initials: '${prenom.isNotEmpty ? prenom[0] : ''}${nom.isNotEmpty ? nom[0] : ''}',
-                    showOnlineDot: dispo,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    fullName.isNotEmpty ? fullName : 'Livreur',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.onSurface,
-                        fontSize: 17,
-                        fontFamily: 'Inter'),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.phone_outlined,
-                          size: 12,
-                          color: AppColors.onSurface.withValues(alpha: 0.6)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          telephone.isNotEmpty ? telephone : 'Non renseigné',
-                          style: TextStyle(
-                              color: AppColors.onSurface.withValues(alpha: 0.6),
-                              fontSize: 12,
-                              fontFamily: 'Inter'),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (vehicule.isNotEmpty || plaque.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.directions_car_rounded,
-                              size: 14,
-                              color:
-                                  AppColors.onSurface.withValues(alpha: 0.7)),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$vehicule ${plaque.isNotEmpty ? '\u00b7 $plaque' : ''}',
-                            style: TextStyle(
-                                color: AppColors.onSurface
-                                    .withValues(alpha: 0.7),
-                                fontSize: 12,
-                                fontFamily: 'Inter'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 4),
-            _menuItem(
-              icon: Icons.dashboard_rounded,
-              label: 'Tableau de bord',
-              selected: _currentIndex == 0,
-              onTap: () {
-                setState(() => _currentIndex = 0);
-                Navigator.pop(context);
-              },
-            ),
-            _menuItem(
-              icon: Icons.local_shipping_rounded,
-              label: 'Mes livraisons',
-              selected: _currentIndex == 1,
-              onTap: () {
-                setState(() => _currentIndex = 1);
-                Navigator.pop(context);
-              },
-            ),
-            _menuItem(
-              icon: Icons.calendar_month_rounded,
-              label: 'Planning',
-              selected: _currentIndex == 2,
-              onTap: () {
-                setState(() => _currentIndex = 2);
-                Navigator.pop(context);
-              },
-            ),
-            _menuItem(
-              icon: Icons.map_rounded,
-              label: 'Carte',
-              selected: _currentIndex == 3,
-              onTap: () {
-                setState(() => _currentIndex = 3);
-                Navigator.pop(context);
-              },
-            ),
-            _menuItem(
-              icon: Icons.person_rounded,
-              label: 'Mon profil',
-              selected: _currentIndex == 4,
-              onTap: () {
-                setState(() => _currentIndex = 4);
-                Navigator.pop(context);
-              },
-            ),
-            const Divider(height: 1),
-            _menuItem(
-              icon: Icons.history_rounded,
-              label: 'Historique',
-              selected: false,
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/history');
-              },
-            ),
-            const Spacer(),
-            _menuItem(
-              icon: Icons.lock_outline_rounded,
-              label: 'Changer le mot de passe',
-              selected: false,
-              color: AppColors.onSurfaceVariant,
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/change-password');
-              },
-            ),
-            _menuItem(
-              icon: Icons.logout_rounded,
-              label: 'Déconnexion',
-              selected: false,
-              color: AppColors.statusFailed,
-              onTap: () async {
-                Navigator.pop(context);
-                final confirm = await _confirmLogout();
-                if (confirm) {
-                  _cleanLogout();
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const AppLogoCompact(size: 20),
-                  const SizedBox(width: 6),
-                  const Text('KingDely Route',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.onSurfaceVariant,
-                          fontWeight: FontWeight.w500,
-                          fontFamily: 'Inter')),
-                ],
-              ),
-            ),
-          ],
+      drawer: MainDrawer(
+        fullName: fullName,
+        photoUrl: photoUrl,
+        telephone: telephone,
+        vehicule: vehicule,
+        plaque: plaque,
+        dispo: dispo,
+        currentIndex: _currentIndex,
+        onSelectTab: (i) => setState(() => _currentIndex = i),
+        onHistory: () => Navigator.pushNamed(context, '/history'),
+        onChangePassword: () =>
+            Navigator.pushNamed(context, '/change-password'),
+        onLateOrders: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const DeliveryListScreen(initialFilter: 'retard'),
+          ),
         ),
+        onSettings: () => Navigator.pushNamed(context, '/settings'),
+        onHelp: () => Navigator.pushNamed(context, '/help'),
+        onAbout: () => Navigator.pushNamed(context, '/about'),
+        onLogout: _handleLogout,
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
@@ -326,80 +205,34 @@ class _MainShellState extends State<MainShell> {
             surfaceTintColor: Colors.transparent,
             destinations: const [
               NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined,
-                    color: AppColors.onSurfaceVariant),
-                selectedIcon: Icon(Icons.dashboard_rounded,
-                    color: AppColors.primaryContainer),
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard_rounded),
                 label: 'Dashboard',
               ),
               NavigationDestination(
-                icon: Icon(Icons.local_shipping_outlined,
-                    color: AppColors.onSurfaceVariant),
-                selectedIcon: Icon(Icons.local_shipping_rounded,
-                    color: AppColors.primaryContainer),
+                icon: Icon(Icons.local_shipping_outlined),
+                selectedIcon: Icon(Icons.local_shipping_rounded),
                 label: 'Livraisons',
               ),
               NavigationDestination(
-                icon: Icon(Icons.calendar_month_outlined,
-                    color: AppColors.onSurfaceVariant),
-                selectedIcon: Icon(Icons.calendar_month_rounded,
-                    color: AppColors.primaryContainer),
+                icon: Icon(Icons.calendar_month_outlined),
+                selectedIcon: Icon(Icons.calendar_month_rounded),
                 label: 'Planning',
               ),
               NavigationDestination(
-                icon: Icon(Icons.map_outlined,
-                    color: AppColors.onSurfaceVariant),
-                selectedIcon: Icon(Icons.map_rounded,
-                    color: AppColors.primaryContainer),
+                icon: Icon(Icons.map_outlined),
+                selectedIcon: Icon(Icons.map_rounded),
                 label: 'Carte',
               ),
               NavigationDestination(
-                icon: Icon(Icons.person_outline,
-                    color: AppColors.onSurfaceVariant),
-                selectedIcon: Icon(Icons.person_rounded,
-                    color: AppColors.primaryContainer),
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person_rounded),
                 label: 'Profil',
               ),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _menuItem({
-    required IconData icon,
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-    Color? color,
-  }) {
-    final clr =
-        color ?? (selected ? AppColors.primaryContainer : AppColors.onSurfaceVariant);
-    return ListTile(
-      leading: Icon(icon,
-          color: selected ? clr : AppColors.onSurfaceVariant, size: 22),
-      title: Text(
-        label,
-        style: TextStyle(
-            color: selected ? clr : AppColors.onSurface,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-            fontSize: 14,
-            fontFamily: 'Inter'),
-      ),
-      trailing: selected
-          ? Container(
-              width: 6,
-              height: 6,
-              decoration: const BoxDecoration(
-                color: AppColors.primaryContainer,
-                shape: BoxShape.circle,
-              ),
-            )
-          : null,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-      onTap: onTap,
     );
   }
 }

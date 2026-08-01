@@ -262,6 +262,12 @@ class AppTheme {
           height: 64,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           surfaceTintColor: Colors.transparent,
+          iconTheme: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const IconThemeData(color: AppColors.orange);
+            }
+            return const IconThemeData(color: AppColors.onSurfaceVariant);
+          }),
         ),
         snackBarTheme: SnackBarThemeData(
           behavior: SnackBarBehavior.floating,

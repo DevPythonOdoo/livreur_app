@@ -179,23 +179,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           _FilterChip(
                               label: 'Tout',
                               value: 'all',
-                              selected: _selectedFilter == 'all'),
+                              selected: _selectedFilter == 'all',
+                              onTap: () => setState(() => _selectedFilter = 'all')),
                           _FilterChip(
                               label: "Aujourd'hui",
                               value: 'today',
-                              selected: _selectedFilter == 'today'),
+                              selected: _selectedFilter == 'today',
+                              onTap: () =>
+                                  setState(() => _selectedFilter = 'today')),
                           _FilterChip(
                               label: 'Hier',
                               value: 'yesterday',
-                              selected: _selectedFilter == 'yesterday'),
+                              selected: _selectedFilter == 'yesterday',
+                              onTap: () => setState(
+                                  () => _selectedFilter = 'yesterday')),
                           _FilterChip(
                               label: 'Cette semaine',
                               value: 'week',
-                              selected: _selectedFilter == 'week'),
+                              selected: _selectedFilter == 'week',
+                              onTap: () =>
+                                  setState(() => _selectedFilter = 'week')),
                           _FilterChip(
                               label: 'Ce mois',
                               value: 'month',
-                              selected: _selectedFilter == 'month'),
+                              selected: _selectedFilter == 'month',
+                              onTap: () =>
+                                  setState(() => _selectedFilter = 'month')),
                         ],
                       ),
                     ),
@@ -245,11 +254,13 @@ class _FilterChip extends StatelessWidget {
   final String label;
   final String value;
   final bool selected;
+  final VoidCallback onTap;
 
   const _FilterChip({
     required this.label,
     required this.value,
     required this.selected,
+    required this.onTap,
   });
 
   @override
@@ -271,7 +282,7 @@ class _FilterChip extends StatelessWidget {
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        onSelected: (_) {},
+        onSelected: (_) => onTap(),
       ),
     );
   }

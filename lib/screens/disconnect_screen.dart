@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import '../widgets/app_theme.dart';
 
 class DisconnectScreen extends StatefulWidget {
@@ -9,7 +10,32 @@ class DisconnectScreen extends StatefulWidget {
 }
 
 class _DisconnectScreenState extends State<DisconnectScreen> {
-  bool _isLoading = false;
+  final _isLoading = false;
+
+  Map<String, dynamic>? get _args =>
+      ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+  String get _fullName {
+    final a = _args;
+    final full = a?['fullName'] as String? ?? '';
+    if (full.isNotEmpty) return full;
+    final prenom = a?['prenom'] as String? ?? '';
+    final nom = a?['nom'] as String? ?? '';
+    return '$prenom $nom'.trim();
+  }
+
+  String get _initials {
+    final name = _fullName;
+    if (name.isEmpty) return 'L';
+    return name
+        .split(' ')
+        .where((p) => p.isNotEmpty)
+        .take(2)
+        .map((p) => p[0].toUpperCase())
+        .join();
+  }
+
+  String? get _photoPath => _args?['photo'] as String?;
 
   @override
   Widget build(BuildContext context) {
@@ -27,11 +53,26 @@ class _DisconnectScreenState extends State<DisconnectScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const GradientCircleAvatar(
+                  GradientCircleAvatar(
                     radius: 48,
-                    initials: 'JD',
+                    imageUrl: _photoPath != null
+                        ? ApiService().mediaUrl(_photoPath!)
+                        : null,
+                    initials: _initials,
                     showOnlineDot: true,
                   ),
+                  if (_fullName.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Text(
+                      _fullName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.onSurface,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   const Text(
                     'Déconnexion',
