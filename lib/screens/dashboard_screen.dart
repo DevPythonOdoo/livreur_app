@@ -6,6 +6,7 @@ import '../models/livraison.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/connectivity.dart';
 import '../widgets/main_drawer.dart';
+import '../widgets/priority_widgets.dart';
 import 'delivery_list_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -1001,24 +1002,33 @@ class _PriorityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isLate = livraison.enRetard;
     final isUrgent = livraison.statut == 'en_cours' && !isLate;
-    final badgeColor = isLate
-        ? AppColors.statusFailed
-        : isUrgent
-            ? AppColors.orange
-            : AppColors.surfaceDim;
-    final badgeText = isLate
-        ? 'EN RETARD'
-        : isUrgent
-            ? 'URGENT'
-            : 'Standard';
-    final badgeTextColor = isLate || isUrgent
+    final hasPriority = livraison.estPrioritaire;
+    final badgeColor = hasPriority
+        ? (livraison.priorite >= 4
+            ? AppColors.statusFailed
+            : AppColors.orange)
+        : isLate
+            ? AppColors.statusFailed
+            : isUrgent
+                ? AppColors.orange
+                : AppColors.surfaceDim;
+    final badgeText = hasPriority
+        ? 'PRIORITAIRE'
+        : isLate
+            ? 'EN RETARD'
+            : isUrgent
+                ? 'URGENT'
+                : 'Standard';
+    final badgeTextColor = isLate || isUrgent || hasPriority
         ? badgeColor
         : AppColors.onSurfaceVariant;
-    final borderColor = isLate
-        ? AppColors.statusFailed.withValues(alpha: 0.4)
-        : isUrgent
-            ? AppColors.orange.withValues(alpha: 0.4)
-            : AppColors.outlineVariant;
+    final borderColor = hasPriority
+        ? badgeColor.withValues(alpha: 0.5)
+        : isLate
+            ? AppColors.statusFailed.withValues(alpha: 0.4)
+            : isUrgent
+                ? AppColors.orange.withValues(alpha: 0.4)
+                : AppColors.outlineVariant;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1055,6 +1065,11 @@ class _PriorityCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (hasPriority) ...[
+                      const SizedBox(width: 6),
+                      PriorityStars(
+                          priorite: livraison.priorite, size: 12),
+                    ],
                     const Spacer(),
                     Text(
                       '#${livraison.commandeNumero}',

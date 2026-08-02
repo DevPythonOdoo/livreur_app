@@ -193,43 +193,89 @@ class _MainShellState extends State<MainShell> {
           ),
         ),
         child: SafeArea(
-          child: NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: (i) => switchToTab(i),
-            backgroundColor: Colors.transparent,
-            indicatorColor:
-                AppColors.primaryContainer.withValues(alpha: 0.15),
-            height: 64,
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            shadowColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard_rounded),
-                label: 'Dashboard',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.local_shipping_outlined),
-                selectedIcon: Icon(Icons.local_shipping_rounded),
-                label: 'Livraisons',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.calendar_month_outlined),
-                selectedIcon: Icon(Icons.calendar_month_rounded),
-                label: 'Planning',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.map_outlined),
-                selectedIcon: Icon(Icons.map_rounded),
-                label: 'Carte',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person_rounded),
-                label: 'Profil',
-              ),
-            ],
+          top: false,
+          child: SizedBox(
+            height: 68,
+            child: Row(
+              children: [
+                _buildNavItem(0, Icons.dashboard_outlined,
+                    Icons.dashboard_rounded, 'Dashboard'),
+                _buildNavItem(1, Icons.local_shipping_outlined,
+                    Icons.local_shipping_rounded, 'Livraisons'),
+                _buildNavItem(2, Icons.calendar_month_outlined,
+                    Icons.calendar_month_rounded, 'Planning'),
+                _buildNavItem(3, Icons.map_outlined, Icons.map_rounded,
+                    'Carte'),
+                _buildNavItem(4, Icons.person_outline, Icons.person_rounded,
+                    'Profil'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(
+      int index, IconData icon, IconData activeIcon, String label) {
+    final selected = _currentIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => switchToTab(index),
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 7),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            decoration: BoxDecoration(
+              color: selected ? AppColors.orange : Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedScale(
+                  scale: selected ? 1.12 : 1.0,
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      selected ? activeIcon : icon,
+                      key: ValueKey(selected),
+                      size: 23,
+                      color: selected
+                          ? Colors.white
+                          : AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                ClipRect(
+                  child: AnimatedAlign(
+                    alignment: Alignment.center,
+                    heightFactor: selected ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

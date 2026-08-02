@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../providers/livraison_provider.dart';
 import '../models/livraison.dart';
 import '../widgets/state_widgets.dart';
 import '../widgets/connectivity.dart';
 import '../widgets/app_theme.dart';
+import '../widgets/priority_widgets.dart';
+import '../widgets/contact_actions.dart';
 import 'map_view_screen.dart';
 
 class DeliveryListScreen extends StatefulWidget {
@@ -41,13 +42,6 @@ class _DeliveryListScreenState extends State<DeliveryListScreen> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _callClient(String phone) async {
-    final uri = Uri.parse('tel:$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
   }
 
   @override
@@ -120,7 +114,6 @@ class _DeliveryListScreenState extends State<DeliveryListScreen> {
                                 const SizedBox(height: 12),
                             itemBuilder: (_, i) => _DeliveryCard(
                               livraison: _filtered(prov)[i],
-                              onCall: _callClient,
                             ),
                           ),
                         ),
@@ -316,11 +309,15 @@ class _DeliveryListScreenState extends State<DeliveryListScreen> {
 
 class _DeliveryCard extends StatelessWidget {
   final Livraison livraison;
-  final void Function(String phone) onCall;
 
-  const _DeliveryCard({required this.livraison, required this.onCall});
+  const _DeliveryCard({required this.livraison});
 
   Color _color(String statut) {
+    if (livraison.estPrioritaire) {
+      return livraison.priorite >= 4
+          ? AppColors.statusFailed
+          : AppColors.orange;
+    }
     switch (statut) {
       case 'livree':
         return AppColors.statusSuccess;
@@ -391,6 +388,10 @@ class _DeliveryCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    if (livraison.estPrioritaire) ...[
+                      PriorityStars(priorite: livraison.priorite),
+                      const SizedBox(width: 8),
+                    ],
                     StatutBadge(
                       statut: livraison.statut,
                       label: livraison.statutDisplay,
@@ -436,8 +437,12 @@ class _DeliveryCard extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         icon: const Icon(Icons.phone_rounded,
                             size: 18, color: AppColors.primaryContainer),
-                        onPressed: () =>
-                            onCall(livraison.clientTelephone),
+                        tooltip: 'Contacter le client',
+                        onPressed: () => showContactSheet(
+                          context,
+                          phone: livraison.clientTelephone,
+                          clientName: livraison.clientNom,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 4),
@@ -449,7 +454,7 @@ class _DeliveryCard extends StatelessWidget {
                         icon: const Icon(Icons.navigation_rounded,
                             size: 18, color: AppColors.primaryContainer),
                         onPressed: () => Navigator.pushNamed(
-                          context, '/map-view',
+                          context, '/navigation',
                           arguments: MapViewArgs(
                               adresse: livraison.adresse,
                               ville: livraison.ville),

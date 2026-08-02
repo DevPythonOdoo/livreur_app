@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/livraison_provider.dart';
 import '../widgets/connectivity.dart';
 import '../widgets/app_theme.dart';
+import '../widgets/priority_widgets.dart';
+import '../widgets/contact_actions.dart';
 import 'map_view_screen.dart';
 import '../services/receipt_service.dart';
 
@@ -49,8 +51,8 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     }
   }
 
-  Future<void> _openMaps(String adresse, String ville) async {
-    Navigator.of(context).pushNamed('/map-view',
+  void _openMaps(String adresse, String ville) {
+    Navigator.of(context).pushNamed('/navigation',
         arguments: MapViewArgs(adresse: adresse, ville: ville));
   }
 
@@ -177,6 +179,13 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                           padding: EdgeInsets.fromLTRB(Spacing.marginMobile, Spacing.xl, Spacing.marginMobile, hasActions ? 100 : Spacing.xl),
                           child: Column(
                             children: [
+                              if (liv.estPrioritaire) ...[
+                                PriorityBanner(
+                                  priorite: liv.priorite,
+                                  fraisPriorite: liv.fraisPriorite,
+                                ),
+                                const SizedBox(height: Spacing.md),
+                              ],
                               _buildClientCard(theme, liv),
                               const SizedBox(height: Spacing.md),
                               _buildCommandeCard(theme, liv, couleur),
@@ -266,7 +275,8 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
         children: [
           Expanded(
             child: FilledButton.icon(
-              onPressed: () => _action('depart'),
+              onPressed: () => _action('depart',
+                  adresse: liv.adresse, ville: liv.ville),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.orange,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -362,7 +372,11 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                               fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.onSurface)),
                       const SizedBox(height: 2),
                       GestureDetector(
-                        onTap: () => _callClient(liv.clientTelephone),
+                        onTap: () => showContactSheet(
+                          context,
+                          phone: liv.clientTelephone,
+                          clientName: liv.clientNom,
+                        ),
                         child: Row(
                           children: [
                             const Icon(Icons.phone_rounded,
@@ -490,6 +504,32 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                 ),
               ],
             ),
+            if (liv.fraisPriorite > 0) ...[
+              const SizedBox(height: Spacing.sm),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.stars_rounded,
+                          size: 15, color: AppColors.orange),
+                      const SizedBox(width: 6),
+                      const Text('Frais de priorité',
+                          style: TextStyle(
+                              color: AppColors.onSurfaceVariant,
+                              fontSize: 14)),
+                    ],
+                  ),
+                  Text(
+                    '+ ${liv.fraisPriorite.toStringAsFixed(0)} FCFA',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppColors.orange),
+                  ),
+                ],
+              ),
+            ],
             if (liv.commandeModePaiement.isNotEmpty) ...[
               const Divider(height: Spacing.xxl),
               Row(
@@ -747,7 +787,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     );
   }
 
-  Future<void> _action(String action) async {
+  Future<void> _action(String action, {String adresse = '', String ville = ''}) async {
     final prov = context.read<LivraisonProvider>();
     final messenger = ScaffoldMessenger.of(context);
     final ok = await prov.updateStatus(widget.livraisonId, action);
@@ -760,6 +800,10 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
               : action == 'depart'
                   ? 'Départ enregistré'
                   : 'Arrivée enregistrée'));
+      if (action == 'depart' && adresse.isNotEmpty) {
+        Navigator.of(context).pushNamed('/navigation',
+            arguments: MapViewArgs(adresse: adresse, ville: ville));
+      }
     } else if (mounted) {
       messenger.showSnackBar(_errorSnack('Erreur lors de la mise à jour'));
     }
@@ -880,13 +924,6 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
           _errorSnack('Erreur : impossible de générer le ticket'),
         );
       }
-    }
-  }
-
-  Future<void> _callClient(String phone) async {
-    final uri = Uri.parse('tel:$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 

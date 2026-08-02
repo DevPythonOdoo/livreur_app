@@ -15,6 +15,7 @@ import 'screens/delivery_detail_screen.dart';
 import 'screens/confirm_delivery_screen.dart';
 import 'screens/report_failure_screen.dart';
 import 'screens/map_view_screen.dart';
+import 'screens/navigation_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/planning_screen.dart';
 import 'screens/disconnect_screen.dart';
@@ -73,6 +74,12 @@ class KingDelyRouteApp extends StatelessWidget {
             return MaterialPageRoute(
               builder: (_) =>
                   MapViewScreen(adresse: args.adresse, ville: args.ville),
+            );
+          case '/navigation':
+            final args = settings.arguments as MapViewArgs;
+            return MaterialPageRoute(
+              builder: (_) =>
+                  NavigationScreen(adresse: args.adresse, ville: args.ville),
             );
           case '/phone-login':
             return MaterialPageRoute(

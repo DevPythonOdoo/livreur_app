@@ -29,6 +29,8 @@ class Livraison {
   final String? motifEchec;
   final String dateCreation;
   final int ordre;
+  final int priorite;
+  final double fraisPriorite;
   final List<LivraisonEvent> evenements;
 
   Livraison({
@@ -58,6 +60,8 @@ class Livraison {
     this.motifEchec,
     required this.dateCreation,
     this.ordre = 0,
+    this.priorite = 0,
+    this.fraisPriorite = 0,
     this.evenements = const [],
   });
 
@@ -94,6 +98,9 @@ class Livraison {
       motifEchec: json['motif_echec'],
       dateCreation: json['date_creation'] ?? '',
       ordre: json['ordre'] ?? 0,
+      priorite: int.tryParse('${json['priorite'] ?? '0'}') ?? 0,
+      fraisPriorite: double.tryParse(
+          '${json['frais_priorite'] ?? '0'}') ?? 0,
       evenements: (json['evenements'] as List<dynamic>?)
               ?.map((e) => LivraisonEvent.fromJson(e))
               .toList() ??
@@ -145,6 +152,21 @@ class Livraison {
       statut == 'preparation' ||
       statut == 'en_cours' ||
       statut == 'arrive_destination';
+
+  /// Vrai si la livraison est prioritaire (au moins 1 étoile).
+  bool get estPrioritaire => priorite > 0;
+
+  /// Libellé français du niveau de priorité.
+  String get prioriteLabel {
+    switch (priorite) {
+      case 1: return 'Priorité basse';
+      case 2: return 'Priorité moyenne';
+      case 3: return 'Priorité élevée';
+      case 4: return 'Très prioritaire';
+      case 5: return 'URGENCE MAXIMALE';
+      default: return 'Normale';
+    }
+  }
 }
 
 /// Modèle représentant un événement lié à une livraison
