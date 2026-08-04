@@ -51,9 +51,15 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     }
   }
 
-  void _openMaps(String adresse, String ville) {
+  void _openMaps(dynamic liv) {
     Navigator.of(context).pushNamed('/navigation',
-        arguments: MapViewArgs(adresse: adresse, ville: ville));
+        arguments: MapViewArgs(
+          adresse: liv.adresse,
+          ville: liv.ville,
+          livraisonId: liv.id,
+          statut: liv.statut,
+          clientNom: liv.clientNom,
+        ));
   }
 
   @override
@@ -291,7 +297,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             width: 48,
             height: 48,
             child: OutlinedButton(
-              onPressed: () => _openMaps(liv.adresse, liv.ville),
+              onPressed: () => _openMaps(liv),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.orange),
                 shape: RoundedRectangleBorder(
@@ -430,7 +436,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                     child: IconButton(
                       icon: const Icon(Icons.navigation_rounded,
                           color: AppColors.primaryContainer, size: 20),
-                      onPressed: () => _openMaps(liv.adresse, liv.ville),
+                      onPressed: () => _openMaps(liv),
                       tooltip: 'Itinéraire',
                     ),
                   ),
@@ -800,9 +806,15 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
               : action == 'depart'
                   ? 'Départ enregistré'
                   : 'Arrivée enregistrée'));
-      if (action == 'depart' && adresse.isNotEmpty) {
+      if (action == 'depart' && adresse.isNotEmpty && mounted) {
         Navigator.of(context).pushNamed('/navigation',
-            arguments: MapViewArgs(adresse: adresse, ville: ville));
+            arguments: MapViewArgs(
+              adresse: adresse,
+              ville: ville,
+              livraisonId: widget.livraisonId,
+              statut: 'en_cours',
+              clientNom: prov.selectedLivraison?.clientNom,
+            ));
       }
     } else if (mounted) {
       messenger.showSnackBar(_errorSnack('Erreur lors de la mise à jour'));

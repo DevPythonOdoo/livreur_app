@@ -456,8 +456,12 @@ class _DeliveryCard extends StatelessWidget {
                         onPressed: () => Navigator.pushNamed(
                           context, '/navigation',
                           arguments: MapViewArgs(
-                              adresse: livraison.adresse,
-                              ville: livraison.ville),
+                            adresse: livraison.adresse,
+                            ville: livraison.ville,
+                            livraisonId: livraison.id,
+                            statut: livraison.statut,
+                            clientNom: livraison.clientNom,
+                          ),
                         ),
                       ),
                     ),

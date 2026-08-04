@@ -78,8 +78,13 @@ class KingDelyRouteApp extends StatelessWidget {
           case '/navigation':
             final args = settings.arguments as MapViewArgs;
             return MaterialPageRoute(
-              builder: (_) =>
-                  NavigationScreen(adresse: args.adresse, ville: args.ville),
+              builder: (_) => NavigationScreen(
+                adresse: args.adresse,
+                ville: args.ville,
+                livraisonId: args.livraisonId,
+                statut: args.statut,
+                clientNom: args.clientNom,
+              ),
             );
           case '/phone-login':
             return MaterialPageRoute(

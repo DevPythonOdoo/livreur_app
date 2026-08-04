@@ -9,7 +9,16 @@ import '../widgets/app_theme.dart';
 class MapViewArgs {
   final String adresse;
   final String ville;
-  const MapViewArgs({required this.adresse, required this.ville});
+  final int? livraisonId;
+  final String? statut;
+  final String? clientNom;
+  const MapViewArgs({
+    required this.adresse,
+    required this.ville,
+    this.livraisonId,
+    this.statut,
+    this.clientNom,
+  });
 }
 
 /// Carte embarquée (OpenStreetMap) de l'adresse de livraison.

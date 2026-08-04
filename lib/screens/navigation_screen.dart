@@ -5,6 +5,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
+import '../providers/livraison_provider.dart';
 import '../widgets/app_theme.dart';
 
 /// Couche trafic en temps réel : les serveurs publics Yandex (sans clé)
@@ -18,13 +20,73 @@ const bool kTrafficEnabled = false;
 const String kTrafficUrlTemplate =
     'https://tile.maps.yandex.net/tiles?l=trf&x={x}&y={y}&z={z}&scale=1&lang=fr_FR';
 
+/// Style d'affichage d'une carte (tuiles sans clé API).
+class MapStyle {
+  final String label;
+  final IconData icon;
+  final String url;
+  final double maxZoom;
+  final String attribution;
+  const MapStyle({
+    required this.label,
+    required this.icon,
+    required this.url,
+    required this.maxZoom,
+    required this.attribution,
+  });
+}
+
+/// Vues de carte disponibles : basculables via le bouton en haut à droite.
+const List<MapStyle> kMapStyles = [
+  MapStyle(
+    label: 'Rues',
+    icon: Icons.map_rounded,
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    maxZoom: 19,
+    attribution: '© OpenStreetMap · OSRM · Trafic © Yandex',
+  ),
+  MapStyle(
+    label: 'Satellite',
+    icon: Icons.satellite_alt_rounded,
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/'
+        'World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    maxZoom: 19,
+    attribution: '© Esri, Maxar, Earthstar Geographics',
+  ),
+  MapStyle(
+    label: 'Topo',
+    icon: Icons.terrain_rounded,
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/'
+        'World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+    maxZoom: 19,
+    attribution: '© Esri, OpenStreetMap contributors',
+  ),
+  MapStyle(
+    label: 'Google',
+    icon: Icons.public_rounded,
+    url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    maxZoom: 19,
+    attribution: '© Google Maps',
+  ),
+];
+
 /// Écran de navigation : positionne le livreur sur la carte, trace
 /// l'itinéraire le plus court (OSRM) et affiche le trafic si une clé
 /// HERE est configurée. Ne quitte jamais l'application.
 class NavigationScreen extends StatefulWidget {
   final String adresse;
   final String ville;
-  const NavigationScreen({super.key, required this.adresse, required this.ville});
+  final int? livraisonId;
+  final String? statut;
+  final String? clientNom;
+  const NavigationScreen({
+    super.key,
+    required this.adresse,
+    required this.ville,
+    this.livraisonId,
+    this.statut,
+    this.clientNom,
+  });
 
   @override
   State<NavigationScreen> createState() => _NavigationScreenState();
@@ -38,16 +100,34 @@ class _NavigationScreenState extends State<NavigationScreen> {
   List<LatLng> _route = [];
   double _distanceM = 0;
   int _durationS = 0;
+  int _mapStyleIndex = 0;
   bool _loading = true;
   bool _loadingRoute = false;
   String? _locationError;
   String? _routeError;
   Timer? _posTimer;
+  String? _statut;
+  bool _actionBusy = false;
 
   @override
   void initState() {
     super.initState();
+    _statut = widget.statut;
     _init();
+    if (widget.livraisonId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStatut());
+    }
+  }
+
+  Future<void> _refreshStatut() async {
+    final id = widget.livraisonId;
+    if (id == null) return;
+    final prov = context.read<LivraisonProvider>();
+    await prov.loadDetail(id);
+    final liv = prov.selectedLivraison;
+    if (liv != null && mounted && liv.statut != _statut) {
+      setState(() => _statut = liv.statut);
+    }
   }
 
   @override
@@ -214,6 +294,102 @@ class _NavigationScreenState extends State<NavigationScreen> {
     _mapController.move(d, 17);
   }
 
+  bool get _hasActions {
+    final s = widget.livraisonId == null ? null : _statut;
+    return s == 'preparation' ||
+        s == 'prise_en_charge' ||
+        s == 'en_cours' ||
+        s == 'arrive_destination';
+  }
+
+  Future<void> _runAction(Future<bool> Function() apiCall,
+      {required String doneMessage}) async {
+    if (_actionBusy) return;
+    setState(() => _actionBusy = true);
+    final prov = context.read<LivraisonProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await apiCall();
+    if (!mounted) return;
+    setState(() => _actionBusy = false);
+    if (ok) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Row(children: [
+            const Icon(Icons.check_circle_rounded,
+                color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Text(doneMessage,
+                style: const TextStyle(fontWeight: FontWeight.w500)),
+          ]),
+          backgroundColor: AppColors.statusSuccess,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      await prov.loadDetail(widget.livraisonId!);
+      final liv = prov.selectedLivraison;
+      if (liv != null && mounted) setState(() => _statut = liv.statut);
+    } else {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Row(children: [
+            const Icon(Icons.error_outline_rounded,
+                color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            const Text('Erreur lors de la mise à jour',
+                style: TextStyle(fontWeight: FontWeight.w500)),
+          ]),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
+
+  Future<void> _startCourse() {
+    final id = widget.livraisonId;
+    if (id == null) return Future.value();
+    final prov = context.read<LivraisonProvider>();
+    return _runAction(
+      () => prov.updateStatus(id, 'depart'),
+      doneMessage: 'Départ enregistré',
+    );
+  }
+
+  Future<void> _finishCourse() {
+    final id = widget.livraisonId;
+    if (id == null) return Future.value();
+    final prov = context.read<LivraisonProvider>();
+    return _runAction(
+      () => prov.updateStatus(id, 'arrivee'),
+      doneMessage: 'Arrivée enregistrée',
+    );
+  }
+
+  Future<void> _abandonCourse() async {
+    final id = widget.livraisonId;
+    if (id == null) return;
+    await Navigator.of(context).pushNamed('/report-failure', arguments: id);
+    if (!mounted) return;
+    setState(() => _actionBusy = false);
+    await _refreshStatut();
+  }
+
+  Future<void> _openConfirmDelivery() async {
+    final id = widget.livraisonId;
+    if (id == null) return;
+    await Navigator.of(context).pushNamed(
+      '/confirm-delivery',
+      arguments: {
+        'id': id,
+        'clientName': widget.clientNom ?? 'Client',
+      },
+    );
+    if (!mounted) return;
+    await _refreshStatut();
+  }
+
   String _formatDistance(double m) {
     if (m >= 1000) return '${(m / 1000).toStringAsFixed(1)} km';
     return '${m.round()} m';
@@ -249,6 +425,17 @@ class _NavigationScreenState extends State<NavigationScreen> {
               ),
             ),
           Positioned(
+            right: 12,
+            top: 8,
+            child: _mapButton(
+              kMapStyles[_mapStyleIndex].icon,
+              tooltip: 'Vue : ${kMapStyles[_mapStyleIndex].label}',
+              onTap: () => setState(() {
+                _mapStyleIndex = (_mapStyleIndex + 1) % kMapStyles.length;
+              }),
+            ),
+          ),
+          Positioned(
             left: 8,
             top: 8,
             child: Container(
@@ -258,18 +445,25 @@ class _NavigationScreenState extends State<NavigationScreen> {
                 color: Colors.white.withValues(alpha: 0.85),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: const Text(
-                '© OpenStreetMap · OSRM · Trafic © Yandex',
-                style: TextStyle(fontSize: 9, color: Colors.black54),
+              child: Text(
+                kMapStyles[_mapStyleIndex].attribution,
+                style: const TextStyle(fontSize: 9, color: Colors.black54),
               ),
             ),
           ),
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
+            bottom: _hasActions ? 72 : 0,
             child: _buildInfoCard(),
           ),
+          if (_hasActions)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _buildActionBar(),
+            ),
         ],
       ),
     );
@@ -327,9 +521,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
       ),
       children: [
         TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          urlTemplate: kMapStyles[_mapStyleIndex].url,
           userAgentPackageName: 'com.momile.livreur_app',
-          maxZoom: 18,
+          maxZoom: kMapStyles[_mapStyleIndex].maxZoom,
           keepBuffer: 2,
           tileDisplay: const TileDisplay.fadeIn(),
         ),
@@ -385,6 +579,97 @@ class _NavigationScreenState extends State<NavigationScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildActionBar() {
+    final s = _statut;
+    final busy = _actionBusy;
+    final Widget startBtn = Expanded(
+      child: FilledButton.icon(
+        onPressed: busy ? null : _startCourse,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.orange,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        icon: _actionBusy
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Icon(Icons.play_circle_rounded, size: 20),
+        label: const Text('Démarrer la course',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+      ),
+    );
+    final Widget arriveBtn = Expanded(
+      child: FilledButton.icon(
+        onPressed: _actionBusy ? null : _finishCourse,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.orange,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        icon: _actionBusy
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Icon(Icons.flag_rounded, size: 20),
+        label: const Text('Terminer la course',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+      ),
+    );
+    final Widget deliverBtn = Expanded(
+      child: FilledButton.icon(
+        onPressed: _actionBusy ? null : _openConfirmDelivery,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.statusSuccess,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        icon: const Icon(Icons.check_circle_rounded, size: 20),
+        label: const Text('Confirmer la livraison',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+      ),
+    );
+    final Widget cancelBtn = SizedBox(
+      height: 48,
+      child: OutlinedButton.icon(
+        onPressed: _actionBusy ? null : _abandonCourse,
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: AppColors.error),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          foregroundColor: AppColors.error,
+        ),
+        icon: const Icon(Icons.cancel_rounded, size: 20),
+        label: Text(
+          s == 'arrive_destination' ? 'Échec' : 'Annuler',
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x0F000000),
+            blurRadius: 12,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          if (s == 'en_cours' || s == 'arrive_destination') ...[
+            cancelBtn,
+            const SizedBox(width: 10),
+          ],
+          if (s == 'preparation' || s == 'prise_en_charge') startBtn,
+          if (s == 'en_cours') arriveBtn,
+          if (s == 'arrive_destination') deliverBtn,
+        ],
+      ),
     );
   }
 
