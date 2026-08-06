@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/livraison_provider.dart';
 import '../models/livraison.dart';
@@ -80,6 +81,29 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _loadPlanning();
   }
 
+  DateTime get _rangeCenter => _visibleDates[14];
+
+  bool _isInRange(DateTime d) {
+    final f = _visibleDates.first;
+    final l = _visibleDates.last;
+    final d0 = DateTime(d.year, d.month, d.day);
+    return !d0.isBefore(DateTime(f.year, f.month, f.day)) &&
+        !d0.isAfter(DateTime(l.year, l.month, l.day));
+  }
+
+  void _goToMonth(int deltaMonths) {
+    final c = _rangeCenter;
+    final newCenter = DateTime(c.year, c.month + deltaMonths, 15);
+    setState(() {
+      _visibleDates = _buildDateRange(newCenter);
+      if (!_isInRange(_selectedDate)) {
+        _selectedDate = _rangeCenter;
+        context.read<LivraisonProvider>().selectAgendaDate(_selectedDate);
+      }
+    });
+    _loadPlanning();
+  }
+
   String _dayName(DateTime d) {
     const names = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
     return names[d.weekday - 1];
@@ -143,10 +167,63 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   Widget _buildDateStrip(LivraisonProvider provider) {
+    final c = _rangeCenter;
     return Container(
       color: Colors.white,
       child: Column(
         children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.skip_previous_rounded, size: 20),
+                tooltip: 'Année précédente',
+                color: AppColors.onSurfaceVariant,
+                onPressed: () => _goToMonth(-12),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_left_rounded, size: 24),
+                tooltip: 'Mois précédent',
+                color: AppColors.primaryContainer,
+                onPressed: () => _goToMonth(-1),
+              ),
+              Expanded(
+                child: InkWell(
+                  onTap: _goToToday,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Text(
+                      DateFormat('MMMM yyyy', 'fr').format(c).toUpperCase(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryContainer,
+                        fontFamily: 'Inter',
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right_rounded, size: 24),
+                tooltip: 'Mois suivant',
+                color: AppColors.primaryContainer,
+                onPressed: () => _goToMonth(1),
+              ),
+              IconButton(
+                icon: const Icon(Icons.skip_next_rounded, size: 20),
+                tooltip: 'Année suivante',
+                color: AppColors.onSurfaceVariant,
+                onPressed: () => _goToMonth(12),
+              ),
+            ],
+          ),
+          Container(
+            height: 1,
+            color: AppColors.outlineVariant.withValues(alpha: 0.3),
+          ),
           SizedBox(
             height: 72,
             child: ListView.builder(

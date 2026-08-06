@@ -21,6 +21,10 @@ class Livraison {
   final double commandeMontantTtc;
   final int commandeArticlesCount;
   final String commandeModePaiement;
+  final String commandeStatutPaiement;
+  final String commandeStatutPaiementLabel;
+  final List<PaiementMoyen> moyensPaiement;
+  final List<CommandePaiement> commandePaiements;
   final String? notes;
   final String? signature;
   final String? photoLivraison;
@@ -52,6 +56,10 @@ class Livraison {
     this.commandeMontantTtc = 0,
     this.commandeArticlesCount = 0,
     this.commandeModePaiement = '',
+    this.commandeStatutPaiement = '',
+    this.commandeStatutPaiementLabel = '',
+    this.moyensPaiement = const [],
+    this.commandePaiements = const [],
     this.notes,
     this.signature,
     this.photoLivraison,
@@ -90,6 +98,17 @@ class Livraison {
       commandeArticlesCount: int.tryParse(
           '${json['commande_articles_count'] ?? '0'}') ?? 0,
       commandeModePaiement: json['commande_mode_paiement'] ?? '',
+      commandeStatutPaiement: json['commande_statut_paiement'] ?? '',
+      commandeStatutPaiementLabel:
+          json['commande_statut_paiement_label'] ?? '',
+      moyensPaiement: (json['moyens_paiement'] as List<dynamic>?)
+              ?.map((e) => PaiementMoyen.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      commandePaiements: (json['commande_paiements'] as List<dynamic>?)
+              ?.map((e) => CommandePaiement.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
       notes: json['notes'],
       signature: json['signature'],
       photoLivraison: json['photo_livraison'],
@@ -155,6 +174,12 @@ class Livraison {
 
   /// Vrai si la livraison est prioritaire (au moins 1 étoile).
   bool get estPrioritaire => priorite > 0;
+
+  /// Vrai si la commande doit être payée à la livraison.
+  bool get aPayerALivraison => commandeStatutPaiement == 'a_la_livraison';
+
+  /// Vrai si la commande est déjà payée.
+  bool get estPayee => commandeStatutPaiement == 'payee';
 
   /// Libellé français du niveau de priorité.
   String get prioriteLabel {
@@ -222,6 +247,62 @@ class DeliveryStats {
       livrees: json['livrees'] ?? 0,
       echecs: json['echecs'] ?? 0,
       enRetard: json['en_retard'] ?? 0,
+    );
+  }
+}
+
+/// Moyen de paiement encaissable à la livraison (proposé par l'API).
+class PaiementMoyen {
+  final String code;
+  final String label;
+
+  PaiementMoyen({required this.code, required this.label});
+
+  /// Construit une instance [PaiementMoyen] à partir d'un JSON.
+  factory PaiementMoyen.fromJson(Map<String, dynamic> json) {
+    return PaiementMoyen(
+      code: json['code'] ?? '',
+      label: json['label'] ?? '',
+    );
+  }
+}
+
+/// Paiement enregistré sur la commande.
+class CommandePaiement {
+  final int id;
+  final String? numero;
+  final String moyen;
+  final String moyenLabel;
+  final String montant;
+  final String statut;
+  final String statutLabel;
+  final String? referenceGeniuspay;
+  final String? datePaiement;
+
+  CommandePaiement({
+    required this.id,
+    this.numero,
+    required this.moyen,
+    required this.moyenLabel,
+    required this.montant,
+    required this.statut,
+    required this.statutLabel,
+    this.referenceGeniuspay,
+    this.datePaiement,
+  });
+
+  /// Construit une instance [CommandePaiement] à partir d'un JSON.
+  factory CommandePaiement.fromJson(Map<String, dynamic> json) {
+    return CommandePaiement(
+      id: json['id'],
+      numero: json['numero'],
+      moyen: json['moyen'] ?? '',
+      moyenLabel: json['moyen_label'] ?? '',
+      montant: json['montant'] ?? '0',
+      statut: json['statut'] ?? '',
+      statutLabel: json['statut_label'] ?? '',
+      referenceGeniuspay: json['reference_geniuspay'],
+      datePaiement: json['date_paiement'],
     );
   }
 }

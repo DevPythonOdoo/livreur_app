@@ -226,17 +226,25 @@ class LivraisonProvider extends ChangeNotifier {
     return false;
   }
 
-  /// Confirme la livraison avec le nom du client, le temps d'attente et des notes.
+  /// Confirme la livraison avec le nom du client, le temps d'attente, des notes
+  /// et, si la commande est à payer à la livraison, le moyen de paiement choisi
+  /// par le client (espece, wave, orange_money, mtn_money) et le montant encaissé.
   Future<Map<String, dynamic>> confirmDelivery({
     required int id,
     required String confirmedByName,
     int tempsAttente = 0,
     String? notes,
+    String? moyenPaiement,
+    double? montantPaye,
   }) async {
     final res = await _api.post('/livraisons/$id/livrer/', {
       'confirmed_by_name': confirmedByName,
       'temps_attente': tempsAttente,
       if (notes != null) 'notes': notes,
+      if (moyenPaiement != null && moyenPaiement.isNotEmpty)
+        'moyen_paiement': moyenPaiement,
+      if (montantPaye != null && montantPaye > 0)
+        'montant_paye': montantPaye.toStringAsFixed(2),
     });
     if (res['status'] == 200) {
       _cache.clear();
@@ -357,6 +365,16 @@ class LivraisonProvider extends ChangeNotifier {
 
     _isPlanningLoading = false;
     notifyListeners();
+  }
+
+  /// Interroge le statut de paiement de la commande (léger, pour le polling
+  /// pendant le paiement mobile money). Retourne le body JSON si succès.
+  Future<Map<String, dynamic>?> fetchStatutPaiement(int livraisonId) async {
+    final res = await _api.get('/livraisons/$livraisonId/statut_paiement/');
+    if (res['status'] == 200 && res['body'] is Map) {
+      return res['body'] as Map<String, dynamic>;
+    }
+    return null;
   }
 
   @override

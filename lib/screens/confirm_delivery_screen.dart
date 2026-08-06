@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/livraison_provider.dart';
+import '../models/livraison.dart';
 import 'signature_pad_screen.dart';
+import 'payment_webview_screen.dart';
 import '../widgets/app_theme.dart';
 
 class ConfirmDeliveryScreen extends StatefulWidget {
@@ -24,24 +26,31 @@ class _ConfirmDeliveryScreenState extends State<ConfirmDeliveryScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  final _montantCtrl = TextEditingController();
   final _picker = ImagePicker();
   File? _photoFile;
   Uint8List? _signatureBytes;
   int _tempsAttente = 0;
   bool _isLoading = false;
   bool _isClient = true;
+  String? _moyenPaiement;
+  bool _montantInitialise = false;
 
   @override
   void initState() {
     super.initState();
     _nameCtrl.text = widget.clientName;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _showIdentityDialog());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<LivraisonProvider>().loadDetail(widget.livraisonId);
+      _showIdentityDialog();
+    });
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _notesCtrl.dispose();
+    _montantCtrl.dispose();
     super.dispose();
   }
 
@@ -144,26 +153,73 @@ class _ConfirmDeliveryScreenState extends State<ConfirmDeliveryScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
 
     final prov = context.read<LivraisonProvider>();
+    final livraison = prov.selectedLivraison;
+    final aPayer = livraison?.aPayerALivraison ?? false;
+
+    if (aPayer && (_moyenPaiement == null || _moyenPaiement!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sélectionnez le moyen de paiement du client'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
     final result = await prov.confirmDelivery(
       id: widget.livraisonId,
       confirmedByName: _nameCtrl.text.trim(),
       tempsAttente: _tempsAttente,
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+      moyenPaiement: aPayer ? _moyenPaiement : null,
+      montantPaye: aPayer ? (double.tryParse(_montantCtrl.text) ?? 0) : null,
     );
 
     if (mounted) {
       setState(() => _isLoading = false);
       if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Livraison confirmée avec succès!'),
-            backgroundColor: AppColors.statusSuccess,
-          ),
-        );
-        Navigator.of(context).popUntil((r) => r.isFirst);
+        final data = result['data'];
+        String? paymentUrl;
+        final estMobileMoney = aPayer && _moyenPaiement != 'espece';
+        if (data is Map) {
+          paymentUrl = data['payment_url'] as String?;
+        }
+        if (estMobileMoney && paymentUrl != null && paymentUrl.isNotEmpty) {
+          // Paiement mobile money : ouvre la WebView intégrée (sans quitter
+          // l'app), qui notifie le livreur quand le paiement est confirmé.
+          final url = paymentUrl;
+          final paid = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (_) => PaymentWebviewScreen(
+                paymentUrl: url,
+                livraisonId: widget.livraisonId,
+              ),
+            ),
+          );
+          if (paid == true && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Paiement confirmé, livraison terminée !'),
+                backgroundColor: AppColors.statusSuccess,
+              ),
+            );
+            Navigator.of(context).popUntil((r) => r.isFirst);
+          }
+          return;
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Livraison confirmée avec succès!'),
+              backgroundColor: AppColors.statusSuccess,
+            ),
+          );
+          Navigator.of(context).popUntil((r) => r.isFirst);
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -173,6 +229,77 @@ class _ConfirmDeliveryScreenState extends State<ConfirmDeliveryScreen> {
         );
       }
     }
+  }
+
+  Widget _buildPaymentSection(Livraison livraison) {
+    final moyens = livraison.moyensPaiement.isNotEmpty
+        ? livraison.moyensPaiement
+        : <PaiementMoyen>[
+            PaiementMoyen(code: 'espece', label: 'Espèces'),
+            PaiementMoyen(code: 'wave', label: 'Wave Money'),
+            PaiementMoyen(code: 'orange_money', label: 'Orange Money'),
+            PaiementMoyen(code: 'mtn_money', label: 'MTN Money'),
+          ];
+
+    return Card(
+      color: AppColors.statusSuccess.withValues(alpha: 0.06),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppColors.statusSuccess.withValues(alpha: 0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Spacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.payments_rounded, color: AppColors.statusSuccess),
+                SizedBox(width: 8),
+                Text('Paiement à la livraison',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const SizedBox(height: Spacing.sm),
+            Text(
+              'Total à encaisser : ${livraison.commandeMontantTtc.toStringAsFixed(2)}',
+              style: const TextStyle(color: AppColors.onSurfaceVariant),
+            ),
+            const SizedBox(height: Spacing.md),
+            TextFormField(
+              controller: _montantCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Montant encaissé *',
+                prefixIcon: Icon(Icons.payments_outlined),
+              ),
+              validator: (v) {
+                final val = double.tryParse(v ?? '');
+                return (val == null || val <= 0) ? 'Montant invalide' : null;
+              },
+            ),
+            const SizedBox(height: Spacing.md),
+            const Text('Moyen de paiement choisi par le client',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: Spacing.sm),
+            ...moyens.map((m) => RadioListTile<String>(
+                  value: m.code,
+                  groupValue: _moyenPaiement,
+                  onChanged: (v) => setState(() => _moyenPaiement = v),
+                  title: Text(m.label),
+                  activeColor: AppColors.statusSuccess,
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                )),
+            const SizedBox(height: Spacing.xs),
+            const Text(
+              'Wave / Orange Money / MTN Money : paiement initié via GeniusPay, l\'application s\'ouvre après confirmation.',
+              style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -305,6 +432,23 @@ class _ConfirmDeliveryScreenState extends State<ConfirmDeliveryScreen> {
                         prefixIcon: Icon(Icons.timer_outlined),
                       ),
                       onChanged: (v) => _tempsAttente = int.tryParse(v) ?? 0,
+                    ),
+                    const SizedBox(height: Spacing.lg),
+                    Consumer<LivraisonProvider>(
+                      builder: (context, prov, _) {
+                        final livraison = prov.selectedLivraison;
+                        if (livraison == null || !livraison.aPayerALivraison) {
+                          return const SizedBox.shrink();
+                        }
+                        if (!_montantInitialise) {
+                          _montantCtrl.text =
+                              livraison.commandeMontantTtc
+                                  .toStringAsFixed(2)
+                                  .replaceAll('.00', '');
+                          _montantInitialise = true;
+                        }
+                        return _buildPaymentSection(livraison);
+                      },
                     ),
                     const SizedBox(height: Spacing.lg),
                     if (_photoFile != null)
