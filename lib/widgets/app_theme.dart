@@ -372,8 +372,15 @@ class GradientCircleAvatar extends StatelessWidget {
             child: CircleAvatar(
               radius: radius,
               backgroundColor: AppColors.surface,
-              backgroundImage:
-                  imageUrl != null ? NetworkImage(imageUrl!) : null,
+              // Décode la photo en petite résolution (avatar) pour économiser
+              // plusieurs Mo de RAM par rendu.
+              backgroundImage: imageUrl != null
+                  ? ResizeImage(
+                      NetworkImage(imageUrl!),
+                      width: (radius * 4).round(),
+                      height: (radius * 4).round(),
+                    )
+                  : null,
               child: imageUrl == null
                   ? Text(
                       initials,

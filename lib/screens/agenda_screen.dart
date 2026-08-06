@@ -17,6 +17,7 @@ class AgendaScreen extends StatefulWidget {
 }
 
 class _AgendaScreenState extends State<AgendaScreen> {
+  static final _monthYearFmt = DateFormat('MMMM yyyy', 'fr');
   late DateTime _selectedDate;
   late DateTime _today;
   late List<DateTime> _visibleDates;
@@ -193,7 +194,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     child: Text(
-                      DateFormat('MMMM yyyy', 'fr').format(c).toUpperCase(),
+                      _monthYearFmt.format(c).toUpperCase(),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 13,

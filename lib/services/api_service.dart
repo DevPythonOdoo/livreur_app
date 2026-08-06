@@ -8,7 +8,7 @@ import '../utils/error_handler.dart';
 /// Gère l'authentification JWT, le rafraîchissement des tokens,
 /// les requêtes GET, POST et multipart.
 class ApiService {
-  static const String defaultBaseUrl = 'http://127.0.0.1:8000/api';
+  static const String defaultBaseUrl = 'http://192.168.8.53:8000/api';
   static const String _tokenKey = 'jwt_token';
   static const String _refreshKey = 'jwt_refresh';
 

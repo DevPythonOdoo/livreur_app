@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../providers/livraison_provider.dart';
 import '../services/api_service.dart';
+import '../services/location_sender.dart';
 import '../services/notification_service.dart';
 import '../models/livraison.dart';
 import '../widgets/app_theme.dart';
@@ -21,7 +22,7 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   Map<String, dynamic>? _profile;
@@ -31,9 +32,15 @@ class _MainShellState extends State<MainShell> {
   bool _authChecked = false;
   bool _manualLogout = false;
 
+  // Onglets déjà visités : les écrans sont montés une seule fois puis
+  // conservés (IndexedStack) pour une navigation instantanée sans perte d'état.
+  final Set<int> _visited = {0};
+  List<Widget> _pages = [];
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _livraisonProvider = Provider.of<LivraisonProvider>(context, listen: false);
     _authProvider = Provider.of<AuthProvider>(context, listen: false);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -55,9 +62,77 @@ class _MainShellState extends State<MainShell> {
           return [];
         });
       }
+      _buildPages();
       _livraisonProvider.startAutoRefresh();
       _loadProfile();
     });
+  }
+
+  /// Suspend polling + GPS en arrière-plan, relance au retour au premier
+  /// plan : grosse économie de batterie et de données mobiles.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_authProvider.isAuthenticated) {
+        _livraisonProvider.startAutoRefresh();
+        LocationSender().start();
+        _restorePolling();
+      }
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _livraisonProvider.stopAutoRefresh();
+      LocationSender().stop();
+      _notifService.stopPolling();
+    }
+  }
+
+  Future<void> _restorePolling() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool('notifications_enabled') ?? true;
+    if (enabled && mounted) {
+      _notifService.startPolling(context, _fetchLivraisons);
+    }
+  }
+
+  Future<List<Livraison>> _fetchLivraisons() async {
+    final res = await ApiService().get('/livraisons/');
+    if (res['status'] == 200) {
+      final body = res['body'];
+      final items = body is Map ? body['results'] as List : body as List;
+      return items.map((j) => Livraison.fromJson(j)).toList();
+    }
+    return [];
+  }
+
+  /// Construit les 5 onglets une seule fois (les instances sont réutilisées :
+  /// un simple changement d'onglet ne re-exécute pas leurs build()).
+  void _buildPages() {
+    _pages = [
+      DashboardScreen(
+        onNavigateToDeliveries: () => switchToTab(1),
+        onSelectTab: switchToTab,
+        onHistory: () => Navigator.pushNamed(context, '/history'),
+        onChangePassword: () =>
+            Navigator.pushNamed(context, '/change-password'),
+        onLateOrders: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const DeliveryListScreen(initialFilter: 'retard'),
+          ),
+        ),
+        onSettings: () => Navigator.pushNamed(context, '/settings'),
+        onHelp: () => Navigator.pushNamed(context, '/help'),
+        onAbout: () => Navigator.pushNamed(context, '/about'),
+        onLogout: _confirmLogout,
+        livreurName: _fullName,
+        profile: _profile,
+      ),
+      DeliveryListScreen(onOpenDrawer: _openDrawer),
+      AgendaScreen(onOpenDrawer: _openDrawer),
+      MapScreen(onOpenDrawer: _openDrawer),
+      ProfileScreen(onLogout: _cleanLogout, onOpenDrawer: _openDrawer),
+    ];
   }
 
   void _onAuthChanged() {
@@ -69,6 +144,7 @@ class _MainShellState extends State<MainShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_authChecked) {
       _authProvider.removeListener(_onAuthChanged);
     }
@@ -86,32 +162,6 @@ class _MainShellState extends State<MainShell> {
     Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
   }
 
-  List<Widget> get _pages => [
-        DashboardScreen(
-          onNavigateToDeliveries: () => setState(() => _currentIndex = 1),
-          onSelectTab: (i) => setState(() => _currentIndex = i),
-          onHistory: () => Navigator.pushNamed(context, '/history'),
-          onChangePassword: () =>
-              Navigator.pushNamed(context, '/change-password'),
-          onLateOrders: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const DeliveryListScreen(initialFilter: 'retard'),
-            ),
-          ),
-          onSettings: () => Navigator.pushNamed(context, '/settings'),
-          onHelp: () => Navigator.pushNamed(context, '/help'),
-          onAbout: () => Navigator.pushNamed(context, '/about'),
-          onLogout: _confirmLogout,
-          livreurName: _fullName,
-          profile: _profile,
-        ),
-        DeliveryListScreen(onOpenDrawer: _openDrawer),
-        AgendaScreen(onOpenDrawer: _openDrawer),
-        MapScreen(onOpenDrawer: _openDrawer),
-        ProfileScreen(onLogout: _cleanLogout, onOpenDrawer: _openDrawer),
-      ];
-
   void _openDrawer() {
     _scaffoldKey.currentState?.openDrawer();
   }
@@ -123,13 +173,20 @@ class _MainShellState extends State<MainShell> {
   }
 
   void switchToTab(int index) {
-    setState(() => _currentIndex = index);
+    if (index == _currentIndex) return;
+    setState(() {
+      _visited.add(index);
+      _currentIndex = index;
+    });
   }
 
   Future<void> _loadProfile() async {
     final res = await ApiService().get('/livreurs/me/');
     if (res['status'] == 200 && mounted) {
-      setState(() => _profile = res['body']);
+      setState(() {
+        _profile = res['body'];
+        _buildPages();
+      });
     }
   }
 
@@ -161,7 +218,15 @@ class _MainShellState extends State<MainShell> {
 
     return Scaffold(
       key: _scaffoldKey,
-      body: _pages[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: List.generate(
+          _pages.length,
+          (i) => _visited.contains(i)
+              ? _pages[i]
+              : const SizedBox.shrink(),
+        ),
+      ),
       drawer: MainDrawer(
         fullName: fullName,
         photoUrl: photoUrl,
@@ -170,7 +235,7 @@ class _MainShellState extends State<MainShell> {
         plaque: plaque,
         dispo: dispo,
         currentIndex: _currentIndex,
-        onSelectTab: (i) => setState(() => _currentIndex = i),
+        onSelectTab: switchToTab,
         onHistory: () => Navigator.pushNamed(context, '/history'),
         onChangePassword: () =>
             Navigator.pushNamed(context, '/change-password'),

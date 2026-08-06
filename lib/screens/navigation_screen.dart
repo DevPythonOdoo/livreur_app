@@ -143,6 +143,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
       await _loadRoute();
     }
     if (mounted) setState(() => _loading = false);
+    // Le timer n'est créé que si l'écran est toujours monté (sinon il ne
+    // serait jamais annulé et la batterie serait vidée inutilement).
+    if (!mounted) return;
     _posTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
       final pos = await _getPosition();
       if (pos != null && mounted) {
@@ -225,6 +228,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   Future<void> _loadRoute() async {
     final d = _driverPos!;
     final t = _dest!;
+    if (!mounted) return;
     setState(() {
       _loadingRoute = true;
       _routeError = null;

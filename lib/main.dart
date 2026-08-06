@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/livraison_provider.dart';
+import 'services/location_sender.dart';
 import 'widgets/app_theme.dart';
 import 'widgets/connectivity.dart';
 import 'screens/splash_screen.dart';
@@ -27,10 +28,21 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr', null);
   Intl.defaultLocale = 'fr';
+
+  final authProvider = AuthProvider();
+  // Suivi temps réel : envoie la position GPS pendant la session du livreur.
+  authProvider.addListener(() {
+    if (authProvider.isAuthenticated) {
+      LocationSender().start();
+    } else {
+      LocationSender().stop();
+    }
+  });
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => authProvider),
         ChangeNotifierProvider(create: (_) => LivraisonProvider()),
         ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
       ],

@@ -58,6 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _toggleVeilleuse(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_veilleuseKey, enabled);
+    if (!mounted) return;
     setState(() => _veilleuseEnabled = enabled);
     if (enabled) {
       WakelockPlus.enable();

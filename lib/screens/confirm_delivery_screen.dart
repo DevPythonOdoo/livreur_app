@@ -373,7 +373,9 @@ class _ConfirmDeliveryScreenState extends State<ConfirmDeliveryScreen> {
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(16),
                                   child: Image.memory(_signatureBytes!,
-                                      fit: BoxFit.contain),
+                                      fit: BoxFit.contain,
+                                      cacheWidth: 720,
+                                      cacheHeight: 400),
                                 )
                               : Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -454,8 +456,14 @@ class _ConfirmDeliveryScreenState extends State<ConfirmDeliveryScreen> {
                     if (_photoFile != null)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
+                        // L'image de la caméra est décodée en basse résolution
+                        // (affichage 180 px) pour éviter un pic de RAM énorme.
                         child: Image.file(_photoFile!,
-                            height: 180, width: double.infinity, fit: BoxFit.cover),
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            cacheWidth: 720,
+                            cacheHeight: 405),
                       ),
                     Card(
                       child: InkWell(

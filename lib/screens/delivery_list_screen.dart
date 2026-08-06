@@ -91,33 +91,39 @@ class _DeliveryListScreenState extends State<DeliveryListScreen> {
                 return RefreshIndicator(
                   onRefresh: () => prov.loadLivraisons(),
                   color: AppColors.primaryContainer,
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverToBoxAdapter(
-                          child: _buildFilterTabs(prov)),
-                      SliverToBoxAdapter(
-                          child: _buildCountInfo(prov)),
-                      if (_filtered(prov).isEmpty)
-                        SliverFillRemaining(
-                          child: _buildEmptyState(prov),
-                        )
-                      else
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(
-                              Spacing.marginMobile,
-                              Spacing.xs,
-                              Spacing.marginMobile,
-                              Spacing.lg),
-                          sliver: SliverList.separated(
-                            itemCount: _filtered(prov).length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 12),
-                            itemBuilder: (_, i) => _DeliveryCard(
-                              livraison: _filtered(prov)[i],
+                  child: Builder(
+                    builder: (context) {
+                      // Filtré une seule fois par build (pas 3 passes).
+                      final filtered = _filtered(prov);
+                      return CustomScrollView(
+                        slivers: [
+                          SliverToBoxAdapter(
+                              child: _buildFilterTabs(prov)),
+                          SliverToBoxAdapter(
+                              child: _buildCountInfo(prov)),
+                          if (filtered.isEmpty)
+                            SliverFillRemaining(
+                              child: _buildEmptyState(prov),
+                            )
+                          else
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(
+                                  Spacing.marginMobile,
+                                  Spacing.xs,
+                                  Spacing.marginMobile,
+                                  Spacing.lg),
+                              sliver: SliverList.separated(
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 12),
+                                itemBuilder: (_, i) => _DeliveryCard(
+                                  livraison: filtered[i],
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                    ],
+                        ],
+                      );
+                    },
                   ),
                 );
               },

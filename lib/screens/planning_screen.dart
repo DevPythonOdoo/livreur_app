@@ -10,6 +10,8 @@ class PlanningScreen extends StatefulWidget {
 }
 
 class _PlanningScreenState extends State<PlanningScreen> {
+  static final _monthFmt = DateFormat('MMMM', 'fr');
+  static final _dayFmt = DateFormat('E', 'fr');
   DateTime _selectedDay = DateTime.now();
   late DateTime _weekStart;
 
@@ -66,7 +68,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Semaine ${_weekStart.weekOfYear} \u2014 ${DateFormat('MMMM', 'fr').format(_weekStart)}',
+                              'Semaine ${_weekStart.weekOfYear} \u2014 ${_monthFmt.format(_weekStart)}',
                               style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
@@ -140,7 +142,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
               children: weekDays.map((day) {
                 final isToday = _isSameDay(day, DateTime.now());
                 final isSelected = _isSameDay(day, _selectedDay);
-                final dayName = DateFormat('E', 'fr').format(day)[0].toUpperCase();
+                final dayName = _dayFmt.format(day)[0].toUpperCase();
                 final dayNum = day.day.toString();
                 return GestureDetector(
                   onTap: () => setState(() => _selectedDay = day),

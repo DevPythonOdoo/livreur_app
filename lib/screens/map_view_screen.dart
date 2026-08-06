@@ -59,6 +59,7 @@ class _MapViewScreenState extends State<MapViewScreen> {
           final lat = double.tryParse('${data[0]['lat']}');
           final lon = double.tryParse('${data[0]['lon']}');
           if (lat != null && lon != null) {
+            if (!mounted) return;
             setState(() {
               _dest = LatLng(lat, lon);
               _loading = false;
@@ -67,11 +68,13 @@ class _MapViewScreenState extends State<MapViewScreen> {
           }
         }
       }
+      if (!mounted) return;
       setState(() {
         _error = 'Adresse introuvable sur la carte';
         _loading = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _error = 'Carte indisponible (hors connexion)';
         _loading = false;

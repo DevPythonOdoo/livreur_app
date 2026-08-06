@@ -11,7 +11,7 @@ class ConnectivityProvider extends ChangeNotifier {
   Timer? _httpCheckTimer;
   bool _httpCheckInProgress = false;
 
-  static const String _checkUrl = 'http://127.0.0.1:8000';
+  static const String _checkUrl = 'http://192.168.8.53:8000';
   static const Duration _httpTimeout = Duration(seconds: 4);
   static const Duration _httpCheckInterval = Duration(seconds: 20);
 

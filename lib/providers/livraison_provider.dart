@@ -111,12 +111,19 @@ class LivraisonProvider extends ChangeNotifier {
       } else {
         items = [];
       }
-      _livraisons = items
+      final parsed = items
           .map((j) => Livraison.fromJson(j as Map<String, dynamic>))
           .toList();
-      _livraisons.sort((a, b) => b.dateCreation.compareTo(a.dateCreation));
+      parsed.sort((a, b) => b.dateCreation.compareTo(a.dateCreation));
+      // N'informe l'UI que si les données ont réellement changé
+      // (évite de rebuilder tous les écrans à chaque tick de 8 s).
+      if (!_sameDeliveries(_livraisons, parsed)) {
+        _livraisons = parsed;
+        notifyListeners();
+      } else {
+        _livraisons = parsed;
+      }
       _cache.set('livraisons', items, ttl: const Duration(seconds: 10));
-      notifyListeners();
       _silentStatsRefresh();
     }
   }
@@ -124,10 +131,38 @@ class LivraisonProvider extends ChangeNotifier {
   Future<void> _silentStatsRefresh() async {
     final res = await _api.get('/livraisons/stats/');
     if (res['status'] == 200) {
-      _stats = DeliveryStats.fromJson(res['body']);
+      final stats = DeliveryStats.fromJson(res['body']);
+      if (!_sameStats(_stats, stats)) {
+        _stats = stats;
+        notifyListeners();
+      } else {
+        _stats = stats;
+      }
       _cache.set('stats', res['body'], ttl: const Duration(seconds: 5));
-      notifyListeners();
     }
+  }
+
+  /// True si deux listes triées de livraisons sont identiques (id, statut, date).
+  bool _sameDeliveries(List<Livraison> a, List<Livraison> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id ||
+          a[i].statut != b[i].statut ||
+          a[i].dateCreation != b[i].dateCreation) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// True si deux statistiques ont les mêmes valeurs affichées.
+  bool _sameStats(DeliveryStats? a, DeliveryStats? b) {
+    if (a == null || b == null) return a == b;
+    return a.aujourdHui == b.aujourdHui &&
+        a.enCours == b.enCours &&
+        a.livrees == b.livrees &&
+        a.echecs == b.echecs &&
+        a.enRetard == b.enRetard;
   }
 
   /// Charge la liste des livraisons depuis le cache puis l'API.

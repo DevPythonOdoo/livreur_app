@@ -25,30 +25,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   List<Livraison> _filtered(LivraisonProvider prov, String filter) {
     final all = prov.livraisons;
+    final now = DateTime.now();
     switch (filter) {
       case 'today':
         return all.where((l) {
           final d = DateTime.tryParse(l.dateCreation);
-          return d != null && _isSameDay(d, DateTime.now());
+          return d != null && _isSameDay(d, now);
         }).toList();
       case 'yesterday':
+        final yesterday = now.subtract(const Duration(days: 1));
         return all.where((l) {
           final d = DateTime.tryParse(l.dateCreation);
-          return d != null &&
-              _isSameDay(d, DateTime.now().subtract(const Duration(days: 1)));
+          return d != null && _isSameDay(d, yesterday);
         }).toList();
       case 'week':
+        final weekAgo = now.subtract(const Duration(days: 7));
         return all.where((l) {
           final d = DateTime.tryParse(l.dateCreation);
-          return d != null &&
-              d.isAfter(DateTime.now().subtract(const Duration(days: 7)));
+          return d != null && d.isAfter(weekAgo);
         }).toList();
       case 'month':
         return all.where((l) {
           final d = DateTime.tryParse(l.dateCreation);
-          return d != null &&
-              d.month == DateTime.now().month &&
-              d.year == DateTime.now().year;
+          return d != null && d.month == now.month && d.year == now.year;
         }).toList();
       default:
         return all;
@@ -293,12 +292,14 @@ class _HistoryCard extends StatelessWidget {
 
   const _HistoryCard({required this.livraison});
 
+  static final _dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+
   @override
   Widget build(BuildContext context) {
     final isSuccess = livraison.statut == 'livree';
     final dt = DateTime.tryParse(livraison.dateCreation);
     final dateStr =
-        dt != null ? DateFormat('dd/MM/yyyy HH:mm').format(dt) : livraison.dateCreation;
+        dt != null ? _dateFmt.format(dt) : livraison.dateCreation;
 
     return Container(
       decoration: BoxDecoration(

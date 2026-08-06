@@ -637,13 +637,16 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             style: const TextStyle(color: AppColors.onSurfaceVariant, fontSize: 14)),
         Text(
           dt != null
-              ? DateFormat('HH:mm').format(dt)
+              ? _timeFmt.format(dt)
               : dateStr,
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.onSurface),
         ),
       ],
     );
   }
+
+  static final _timeFmt = DateFormat('HH:mm');
+  static final _dayMonthFmt = DateFormat('EEEE d MMMM', 'fr');
 
   Widget _buildTimeline(ThemeData theme, dynamic liv) {
     return Card(
@@ -663,9 +666,9 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
               return _timelineItem(
                 label: e.typeLabel,
                 date: dt != null
-                    ? DateFormat('EEEE d MMMM', 'fr').format(dt)
+                    ? _dayMonthFmt.format(dt)
                     : e.date,
-                time: dt != null ? DateFormat('HH:mm').format(dt) : '',
+                time: dt != null ? _timeFmt.format(dt) : '',
                 color: AppColors.primaryContainer,
                 isLast: isLast,
               );
